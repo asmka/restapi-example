@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restapi-example
+  labels:
+    app: restapi-example
+spec:
+  containers:
+  - name: restapi-example
+    image: %RESTAPI_EXAMPLE_IMAGE%
+    imagePullPolicy: Always
+  imagePullSecrets:
+    - name: gitlab-gcp-local-registry
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: restapi-example-svc
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      nodePort: 30080
+  selector:
+    app: restapi-example
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: restapi-example-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: restapi.example.gcp.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: restapi-example-svc
+            port:
+              number: 80

@@ -1,0 +1,36 @@
+variables:
+  RELEASE_VERSION: 0.1.0
+  FASTAPI_EXAMPLE_IMAGE: ${CI_REGISTRY}/dff9th/fastapi-example:latest
+
+stages:
+  - build
+  - deploy
+
+push to container registry:
+  stage: build
+  tags:
+    - docker
+  image:
+    name: docker:19.03.13
+    entrypoint: [""]
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$RELEASE_VERSION -t $CI_REGISTRY_IMAGE:latest -f ./docker/deploy/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:$RELEASE_VERSION
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+deploy to staging:
+  stage: deploy
+  tags:
+    - docker
+  image:
+    name: bitnami/kubectl:1.19.3
+    entrypoint: [""]
+  before_script:
+    - kubectl create secret docker-registry gitlab-gcp-local-registry --docker-server="$CI_REGISTRY" --docker-username="$CI_DEPLOY_USER" --docker-password="$CI_DEPLOY_PASSWORD" --docker-email="$GITLAB_USER_EMAIL" -o yaml --dry-run | kubectl apply -f -
+  script:
+    - cp kubernetes/restapi-example-template.yaml ./restapi-example.yaml
+    - sed -i -e s@%RESTAPI_EXAMPLE_IMAGE%@${FASTAPI_EXAMPLE_IMAGE}@g ./restapi-example.yaml
+    - kubectl apply -f ./restapi-example.yaml
+  environment:
+    name: staging
